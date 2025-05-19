@@ -27,11 +27,11 @@ jobs:
       - name: Build binary
         run: |
           mkdir -p build
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -o build/wwpm-${{ matrix.goos }}-${{ matrix.goarch }} main.go
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 go build -o build/wwpm main.go
       - name: Tar & Gzip
         run: |
           cd build
-          tar czvf wwpm-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz wwpm-${{ matrix.goos }}-${{ matrix.goarch }} ../config.toml
+          tar czvf wwpm-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz wwpm ../config.toml
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
