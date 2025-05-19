@@ -93,10 +93,17 @@ func NewMessage(msgType string, data []byte) (Message, error) {
 			return nil, err
 		}
 		return &m, nil
+	case "html":
+		var m HTMLMessage
+		if err := json.Unmarshal(data, &m); err != nil {
+			return nil, err
+		}
+		return &m, nil
 	default:
 		return nil, errors.New("unknown message type")
 	}
 }
+
 type TextMessage struct {
 	MsgType string `json:"msgtype"`
 	Text    struct {
@@ -109,9 +116,17 @@ func (msg *TextMessage) ToHTML() (string, string, error) {
 		return "", "", errors.New("empty text content")
 	}
 	title := strings.TrimSpace(lines[0])
-	content := fmt.Sprintf("<p>%s</p>", strings.ReplaceAll(msg.Text.Content, "\n", "<br>"))
-	return title, content, nil
+	content := ""
+	if len(lines) > 1 {
+		content = strings.Join(lines[1:], "\n")
+	}
+	if content == "" {
+		content = title
+	}
+	contentHTML := fmt.Sprintf("<p>%s</p>", strings.ReplaceAll(content, "\n", "<br>"))
+	return title, contentHTML, nil
 }
+
 type MarkdownMessage struct {
 	MsgType  string `json:"msgtype"`
 	Markdown struct {
@@ -125,9 +140,17 @@ func (msg *MarkdownMessage) ToHTML() (string, string, error) {
 		return "", "", errors.New("empty markdown content")
 	}
 	title := strings.TrimSpace(lines[0])
-	contentHtml := "<pre>" + content + "</pre>"
+	body := ""
+	if len(lines) > 1 {
+		body = strings.Join(lines[1:], "\n")
+	}
+	if body == "" {
+		body = title
+	}
+	contentHtml := "<pre>" + body + "</pre>"
 	return title, contentHtml, nil
 }
+
 type ImageMessage struct {
 	MsgType string `json:"msgtype"`
 	Image   struct {
@@ -143,6 +166,7 @@ func (msg *ImageMessage) ToHTML() (string, string, error) {
 	content := fmt.Sprintf("<img src='data:image/png;base64,%s' alt='Image Message'/>", msg.Image.Base64)
 	return title, content, nil
 }
+
 type NewsMessage struct {
 	MsgType string `json:"msgtype"`
 	News    struct {
@@ -167,6 +191,21 @@ func (msg *NewsMessage) ToHTML() (string, string, error) {
 	return title, htmlContent, nil
 }
 
+// 新增 HTMLMessage 类型
+type HTMLMessage struct {
+	MsgType string `json:"msgtype"`
+	HTML    struct {
+		Title   string `json:"title"`
+		Content string `json:"content"`
+	} `json:"html"`
+}
+func (msg *HTMLMessage) ToHTML() (string, string, error) {
+	if msg.HTML.Content == "" {
+		return "", "", errors.New("empty html content")
+	}
+	return msg.HTML.Title, msg.HTML.Content, nil
+}
+
 // 工具函数
 func Base64Decode(encoded string) (string, error) {
 	decoded, err := base64.StdEncoding.DecodeString(encoded)
@@ -179,7 +218,7 @@ func errorResponse(c *fiber.Ctx, code, errcode int, errmsg string) error {
 	return c.Status(code).JSON(fiber.Map{"errcode": errcode, "errmsg": errmsg})
 }
 func WrapHTML(body string) string {
-    return fmt.Sprintf(`<!DOCTYPE html>
+	return fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -263,7 +302,10 @@ func MailHandler(cfg *Config) fiber.Handler {
 		if err != nil {
 			return errorResponse(c, 500, 40003, "Failed to generate HTML content")
 		}
-		content = WrapHTML(content)
+		// html 类型不包裹模板，其它类型包裹模板
+		if body.MsgType != "html" {
+			content = WrapHTML(content)
+		}
 		title = StripHTML(title)
 		log.Printf("Sending email to %s, type: %s, title: %s (from: %s)", toAddress, body.MsgType, title, fromAddress)
 		m := NewMailer(providerCfg.SMTPHost, providerCfg.SMTPPort, emailAddress, password)
