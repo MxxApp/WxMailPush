@@ -8,6 +8,5 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /out/wwpm .
-COPY config.toml .
 EXPOSE 8080
 ENTRYPOINT ["./wwpm"]
