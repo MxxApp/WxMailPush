@@ -62,7 +62,7 @@ docker run -d -p 8080:8080 ghcr.io/mxxapp/wwpm:latest
 ### key参数编码例子
 
 ```bash
-echo -n "smtp.qq.com:465|user@qq.com|xxxx123456|sender@qq.com|receiver@qq.com" | base64
+echo -n "smtp.qq.com:465|user@qq.com|xxxx123456|sender@qq.com|receiver@qq.com" | base64 | tr -d '\n'; echo
 ```
 
 ### curl 请求示例
