@@ -1,11 +1,11 @@
 # wecom-webhook-push-mail
 
-本项目兼容企业微信机器人 webhook 接口和消息格式， 接收到的消息内容自动转发到指定邮箱。
+本项目兼容企业微信机器人 webhook 接口和消息格式，接收到的消息内容自动转发到指定邮箱。
 
 ## 功能特性
 
 - 支持企业微信机器人 Webhook 消息格式（text/markdown/news/image）
-- 自定义邮件服务商，可按需配置（QQ/163/自建邮局）
+- 支持自定义邮件服务商，支持任意 SMTP（QQ/163/自建邮局等）
 - 所有认证信息通过 Base64 编码存储在 URL 中
 - 服务器不存储任何用户信息
 - Go 单文件实现，依赖极少，易于维护
@@ -16,75 +16,32 @@
 
 🚨 **部署服务前需先确认可连接目标邮件服务商 SMTP 端口**
 
+---
+
 ## 快速部署
 
 ### 一、二进制部署
 
 #### 1. 下载 Release 包
 
-前往 [Releases 页面](https://github.com/MxxApp/wecom-webhook-push-mail/releases) 下载对应架构的二进制包，解压得到 `wwpm` 和 `config.toml`。
+前往 [Releases 页面](https://github.com/MxxApp/wecom-webhook-push-mail/releases) 下载对应架构的二进制包，解压得到 `wwpm`。
 
-#### 2. 编辑配置文件
+#### 2. 启动服务
 
-参考 `config.toml` 示例：
+```bash
+# 默认 8080 端口
+./wwpm
 
-```toml
-# 服务端口
-port = 8080
-
-# 邮件服务商
-[providers.163]
-email_suffix = "@163.com"
-smtp_host = "smtp.163.com"
-smtp_port = 465
-
-[providers.qq]
-email_suffix = "@qq.com"
-smtp_host = "smtp.qq.com"
-smtp_port = 465
-```
-
-#### 3. 启动服务
-
-```sh
-./wwpm -config=config.toml
-# 或指定自定义配置文件路径
-./wwpm -config=/path/to/your_config.toml
+# 或自定义端口
+./wwpm -port=8080
 ```
 
 ---
 
 ### 二、Docker 部署
 
-#### 1. 拉取镜像
-
-支持多架构（x86_64/arm64），可从 GitHub Packages 拉取：
-
-```sh
-docker pull ghcr.io/mxxapp/wwpm:latest
-# 或指定版本
-docker pull ghcr.io/mxxapp/wwpm:v1.0.0
-```
-
-#### 2. 运行容器
-
-- **挂载配置**（推荐，方便更新配置）：
-
-```sh
-docker run -d \
-  -v /your/local/config.toml:/app/config.toml \
-  -p 8080:8080 \
-  ghcr.io/mxxapp/wwpm:latest
-```
-
-- **自定义配置路径**：
-
-```sh
-docker run -d \
-  -v /your/local/myconfig.toml:/app/myconfig.toml \
-  -p 8080:8080 \
-  ghcr.io/mxxapp/wwpm:latest \
-  -config=/app/myconfig.toml
+```bash
+docker run -d -p 8080:8080 ghcr.io/mxxapp/wwpm:latest
 ```
 
 ---
@@ -92,42 +49,47 @@ docker run -d \
 ## 消息推送用法
 
 向 `/cgi-bin/webhook/send?key=xxxx` 发 POST 请求，Body 为企业微信机器人兼容 JSON，  
-`key` 为 `服务商|用户名|密码` Base64 编码，示例：
+**key** 参数为如下字段用 `|` 分割后 base64 编码：
 
-- 例子（163邮箱，发给自己）：  
-  原文：`163|your163user|your163passwd`  
-  Base64：`MTYzfHlvdXIxNjN1c2VyfHlvdXIxNjNwYXNzd2Q=`
+| 顺序 | 含义                | 示例                       |
+|------|---------------------|----------------------------|
+| 1    | SMTP主机:端口       | smtp.qq.com:465            |
+| 2    | 完整用户名          | user@qq.com                |
+| 3    | 密码                | xxxx123456                 |
+| 4    | 完整发件人邮箱(可选) | sender@qq.com              |
+| 5    | 完整收件人邮箱(可选) | receiver@qq.com            |
 
-- curl 示例：
+### key参数编码例子
 
-```sh
-curl -X POST 'http://localhost:8080/cgi-bin/webhook/send?key=MTYzfHlvdXIxNjN1c2VyfHlvdXIxNjNwYXNzd2Q=' \
-  -H 'Content-Type: application/json' \
-  -d '{"msgtype":"text","text":{"content":"hello\n这是一封测试邮件"}}'
+```bash
+echo -n "smtp.qq.com:465|user@qq.com|xxxx123456|sender@qq.com|receiver@qq.com" | base64
+```
+
+### curl 请求示例
+
+假设你 base64 后结果为 `c210cC5xcS5jb206NDY1fHVzZXJA...`，则：
+
+```bash
+curl -X POST "http://127.0.0.1:8080/cgi-bin/webhook/send?key=c210cC5xcS5jb206NDY1fHVzZXJA..." \
+     -H "Content-Type: application/json" \
+     -d '{
+            "msgtype":"text",
+            "text": {
+                "content": "邮件标题\n这里是正文内容\n支持多行"
+            }
+         }'
 ```
 
 ---
 
-## 参数说明
+## 支持的消息类型
 
-- `/cgi-bin/webhook/send?key=Base64参数`
-    - Base64参数格式:  
-      `服务商|用户名|密码`  
-      `服务商|用户名|密码|发件人(不包含@后缀)`  
-      `服务商|用户名|密码|发件人(不包含@后缀)|收件人完整地址`  
-      `服务商|用户名|密码||收件人完整地址`
-- POST Body：企业微信机器人消息格式
-- 支持消息类型: `text`, `markdown`, `news`, `image`
+- `text`
+- `markdown`
+- `image`
+- `news`
 
----
-
-## 配置文件说明
-
-- `port`：服务监听端口
-- `[providers.xxx]`：邮件服务商配置
-    - `email_suffix`：邮箱后缀
-    - `smtp_host`：SMTP服务器
-    - `smtp_port`：SMTP端口
+消息体请参考 [WeCom 官方文档](https://developer.work.weixin.qq.com/document/path/90236) 或本项目示例。
 
 ---
 
@@ -135,3 +97,6 @@ curl -X POST 'http://localhost:8080/cgi-bin/webhook/send?key=MTYzfHlvdXIxNjN1c2V
 
 - 部分企业邮箱需开启 SMTP/IMAP，并使用授权码而非明文密码
 - 若收不到邮件请检查垃圾箱或 SMTP 配置
+- 发送失败请检查 SMTP 服务器地址/端口、用户名、密码是否正确
+
+---

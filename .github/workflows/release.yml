@@ -31,7 +31,7 @@ jobs:
       - name: Tar & Gzip
         run: |
           cd build
-          tar czvf wwpm-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz wwpm ../config.toml
+          tar czvf wwpm-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz wwpm
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
